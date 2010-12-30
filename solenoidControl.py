@@ -272,10 +272,11 @@ class ControlPanel(HasTraits):
 
 class MainWindowHandler(Handler):
     def close(self, info, is_OK):
+        print("In close handler")
         if ( info.object.panel.solenoid_thread 
                         and info.object.panel.solenoid_thread.isAlive() ):
-            info.object.panel.solenoid_thread.wants_abort = True
-            while info.object.panel.solenoid_thread.isAlive():
+            info.object.panel.closeSolenoidIfOpen()
+            while not info.object.panel.solenoid_thread is None:
                 sleep(0.1)
             wx.Yield()
         return True
