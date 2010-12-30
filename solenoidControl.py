@@ -1,3 +1,5 @@
+#!/Library/Frameworks/Python.framework/Versions/Current/bin/python
+
 # 'Reward window':  Control solenoid for drain and cleaning purposes
 #
 #  Adapted 12/28/10 by histed
@@ -26,6 +28,9 @@ from matplotlib.figure import Figure
 from scipy import *
 import wx
 
+import u6
+import LabJackPython
+
 #! User interface objects
 #!------------------------
 #!
@@ -42,7 +47,7 @@ class ContOpenTraits(HasTraits):
 class PulsedOpenTraits(HasTraits):
     """ Object used to display the results.
     """
-    totalTimeS = Float(60, label="Total time of all pulses (s)", desc='total')
+    totalTimeS = Float(120, label="Total time of all pulses (s)", desc='total')
     pulseTimeS = Float(0.5, label="Pulse time (s)")
     pulsePeriodS = Float(1, label="Pulse period (s)")
     
@@ -90,8 +95,22 @@ class SolenoidThread(Thread):
     totalTimeS = None
     pulsePeriodS = None
 
+    # hardcoded consts
+    u6IONumber = 0 # FIO0
+
     # internal variables
     _openStillLeft = 0
+    _u6H = None
+
+    def __init__(self):
+        Thread.__init__(self) # call the base class constructor
+        try:
+            self._u6H = u6.U6()
+        except LabJackPython.LabJackException:
+            # try it again, if it fails let the exception happen; it can be hung the first time
+            self._u6H = u6.U6()
+
+        self._u6H.getFeedback(u6.BitDirWrite(self.u6IONumber, 1)) # setup for output
 
 
     def run(self):
@@ -102,7 +121,7 @@ class SolenoidThread(Thread):
         assert(self.pulseTimeS > 0)
 
         pulseN = 0
-        while (stT - clock()) < self.totalTimeS:
+        while (clock()-stT) < self.totalTimeS:
 
             pulseStT = clock()
 
@@ -116,12 +135,15 @@ class SolenoidThread(Thread):
             self.display('pulse %d' % pulseN)
             sleep( self.pulsePeriodS - (clock()-pulseStT) )
 
-        
-            
+        # shutdown labjack device
+        self._u6H.close()
+        self._u6H = None
 
 
     def doSinglePulse(self, openTimeS):
         self.display("Opening for %3.1fs" % openTimeS)
+        self._u6H.getFeedback(u6.BitStateWrite(self.u6IONumber, 1)) # set high
+        
         # sleep in 1 s chunks so we can abort
         self._openStillLeft = openTimeS
         while self._openStillLeft > 0 and self.wantsAbort == False:
@@ -147,7 +169,10 @@ class SolenoidThread(Thread):
 
     def closeIt(self):
         """ Close solenoid """
+        self._u6H.getFeedback(u6.BitStateWrite(self.u6IONumber, 0)) # set low
         self.display("Closed")
+
+    
 
 #! The GUI elements
 #!------------------
@@ -178,7 +203,8 @@ class ControlPanel(HasTraits):
     pulsed_button = Button("Start")
     stop_button = Button("Stop")
     results_string =  String()
-    solenoid_thread = Instance(SolenoidThread)
+    #solenoid_thread = Instance(SolenoidThread)
+    solenoid_thread = None #SolenoidThread()
     view = View(Group(
         Group(
             Group(
@@ -196,13 +222,14 @@ class ControlPanel(HasTraits):
             Group(
                 Item('results_string',show_label=False, 
                      springy=True, style='custom'),),
-            label='Solenoid control', dock="tab"),
+            label='controls MH 101228', dock="tab"),
         layout='tabbed'))
 
     def closeSolenoidIfOpen(self):
         """ also kills any pulse train running """
         if self.solenoid_thread and self.solenoid_thread.isAlive():
             self.solenoid_thread.wantsAbort = True
+            self.solenoid_thread = None
             sleep(1);
             self.add_line('Closed forcibly')
 
@@ -277,6 +304,7 @@ class MainWindow(HasTraits):
                 resizable=True, 
                 height=0.75, width=0.75,
                 handler=MainWindowHandler(),
+                title='SolenoidControl',
                 buttons=NoButtons)
                 
 
