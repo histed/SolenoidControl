@@ -18,7 +18,7 @@
 
 
 from threading import Thread
-from time import sleep, clock
+from time import sleep, clock, time
 from enthought.traits.api import *
 from enthought.traits.ui.api import View, Item, Group, \
         HSplit, Handler
@@ -116,24 +116,25 @@ class SolenoidThread(Thread):
     def run(self):
         """ main thread; assumes parameters are set up
         """
-        stT = clock()
+        stT = time()
 
         assert(self.pulseTimeS > 0)
 
         pulseN = 0
-        while (clock()-stT) < self.totalTimeS:
+        while (time()-stT) < self.totalTimeS:
 
-            pulseStT = clock()
+            pulseStT = time()
 
             if self.wantsAbort:
                 self.wantsAbort = False;
                 break
 
+            print (time()-stT)
             # do actual pulse
             self.doSinglePulse(self.pulseTimeS)
             pulseN += 1
             self.display('pulse %d' % pulseN)
-            sleep( self.pulsePeriodS - (clock()-pulseStT) )
+            sleep( self.pulsePeriodS - (time()-pulseStT) )
 
         # shutdown labjack device
         self._u6H.close()
