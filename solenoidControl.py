@@ -1,8 +1,19 @@
+# 'Reward window':  Control solenoid for drain and cleaning purposes
+#
+#  Adapted 12/28/10 by histed
+#  Requires the Enthought Python distribution (Traits)
+
+
+
 
 #! The imports
 #!-------------
 #!
 #! The MPLFigureEditor is imported from last example.
+#
+#
+#
+
 
 from threading import Thread
 from time import sleep, clock
